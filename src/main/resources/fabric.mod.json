@@ -1,15 +1,19 @@
 {
   "schemaVersion": 1,
   "id": "yukiledupe",
-  "version": "${version}",
+  "version": "1.0.0",
   "name": "yukileDupe",
   "description": "Elindeki itemi silmeden kopyalamani saglayan bilgilendirici/ogretici bir mod.",
-  "authors": ["Yukile394"],
+  "authors": [
+    "Yukile394"
+  ],
   "contact": {},
   "license": "MIT",
   "environment": "*",
   "entrypoints": {
-    "main": ["com.yukile.copyitem.CopyItemMod"]
+    "main": [
+      "com.yukile.copyitem.CopyItemMod"
+    ]
   },
   "mixins": [],
   "depends": {
