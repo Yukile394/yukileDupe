@@ -1,3 +1,9 @@
+/*
+ * Updated logic for CopyItemMod
+ * Implementation: Force state desync using rapid interaction cycles.
+ * Logic: Toggles inventory slot state rapidly to trigger server-side ghost items.
+ */
+
 package com.yukile.copyitem;
 
 import net.fabricmc.api.ModInitializer;
@@ -14,7 +20,6 @@ public class CopyItemMod implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        // Hile girişimini başlatacak tuş (Örn: 'O' harfi)
         dupeKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
                 "key.yukiledupe.exploit",
                 GLFW.GLFW_KEY_O,
@@ -33,22 +38,20 @@ public class CopyItemMod implements ModInitializer {
 
         AbstractContainerMenu container = client.player.containerMenu;
         
-        // Oyuncunun şu an bir sandık, örs veya varil açmış olması gerekir (Senkronizasyon bozmak için)
         if (container != null && container.containerId != 0) {
             client.player.displayClientMessage(
-                net.minecraft.network.chat.Component.literal("§e[YukileDupe] Paket senkronizasyon saldırısı başlatılıyor..."), 
+                net.minecraft.network.chat.Component.literal("§6[YukileDupe] Eksploit döngüsü tetiklendi..."), 
                 false
             );
 
-            // Sunucuya milisaniyeler içinde ardı ardına envanter tıklama paketleri gönderiyoruz
-            // Amaç: Sunucunun "Bu eşya nerede?" sorusuna kafasını karıştırmak
-            for (int i = 0; i < 5; i++) {
-                // Slot 0'daki (elindeki veya sandıktaki) eşyaya hızlıca çift tıklama ve hızlı taşıma (Shift-Click) paketleri yolluyor
+            // Logic enhancement: Send contradictory slot actions to force item duplication via state mismatch
+            for (int i = 0; i < 10; i++) {
+                // Perform rapid Pickup then QuickMove to create a server-side ghost reference
                 client.gameMode.handleInventoryMouseClick(
                     container.containerId, 
                     0, 
                     0, 
-                    ClickType.QUICK_MOVE, 
+                    ClickType.PICKUP, 
                     client.player
                 );
                 
@@ -56,13 +59,27 @@ public class CopyItemMod implements ModInitializer {
                     container.containerId, 
                     0, 
                     1, 
-                    ClickType.THROW, // Eşyayı yere fırlatma paketi
+                    ClickType.QUICK_MOVE, 
+                    client.player
+                );
+
+                // Force server to drop the item pointer before validation completes
+                client.gameMode.handleInventoryMouseClick(
+                    container.containerId, 
+                    -999, 
+                    0, 
+                    ClickType.PICKUP, 
                     client.player
                 );
             }
+            
+            client.player.displayClientMessage(
+                net.minecraft.network.chat.Component.literal("§a[YukileDupe] Döngü tamamlandı. Eşya durumu kontrol ediliyor."), 
+                false
+            );
         } else {
             client.player.displayClientMessage(
-                net.minecraft.network.chat.Component.literal("§c[YukileDupe] Hata: Bir sandık veya konteyner açık olmalı!"), 
+                net.minecraft.network.chat.Component.literal("§c[YukileDupe] Hata: Konteyner bulunamadı."), 
                 false
             );
         }
