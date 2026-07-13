@@ -15,6 +15,8 @@ import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import org.lwjgl.glfw.GLFW;
 import java.util.Random;
 
@@ -40,9 +42,6 @@ public class CopyItemMod implements ModInitializer {
     private static final int BTN_GENISLIK = 95;
     private static final int BTN_YUKSEKLIK = 20;
     private static final int BTN_BOSLUK = 2;
-
-    // Action ID sayacı
-    private short actionId = 0;
 
     @Override
     public void onInitialize() {
@@ -115,9 +114,9 @@ public class CopyItemMod implements ModInitializer {
         ctx.drawTextWithShadow(mc.textRenderer, yazi, yaziX, yaziY, renk);
     }
 
-    private short yeniActionId() {
-        actionId++;
-        return actionId;
+    // Boş modifiedStacks map'i
+    private Int2ObjectMap<ItemStack> bosMap() {
+        return new Int2ObjectOpenHashMap<>();
     }
 
     // ==================== MOD 0: BOOK DUPE ====================
@@ -169,7 +168,7 @@ public class CopyItemMod implements ModInitializer {
                             0,
                             SlotActionType.PICKUP,
                             p.getInventory().getStack(hedefSlot).copy(),
-                            yeniActionId()
+                            bosMap()
                     ));
                 }
                 basarili++;
@@ -220,7 +219,7 @@ public class CopyItemMod implements ModInitializer {
                     0,
                     SlotActionType.QUICK_MOVE,
                     hedef != null ? hedef.copy() : ItemStack.EMPTY,
-                    yeniActionId()
+                    bosMap()
             ));
             faz = 2;
             beklemeTick = 0;
@@ -260,7 +259,7 @@ public class CopyItemMod implements ModInitializer {
                     0,
                     SlotActionType.QUICK_MOVE,
                     ItemStack.EMPTY,
-                    yeniActionId()
+                    bosMap()
             ));
 
             c.getNetworkHandler().sendPacket(new CloseHandledScreenC2SPacket(syncId));
@@ -406,4 +405,4 @@ public class CopyItemMod implements ModInitializer {
         }
         return false;
     }
-                                             }
+}
