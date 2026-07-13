@@ -34,14 +34,15 @@ public class CopyItemMod implements ModInitializer {
     private int syncId = -1;
     private boolean containerAcik = false;
 
-    // HUD buton alanları
+    // HUD buton boyutları
     private static final int BTN_X = 10;
     private static final int BTN_Y = 10;
     private static final int BTN_GENISLIK = 95;
     private static final int BTN_YUKSEKLIK = 20;
     private static final int BTN_BOSLUK = 2;
 
-    private int seciliButon = -1; // 0: başlat, 1: durdur, 2: mod, 3: hızlı
+    // Action ID sayacı
+    private short actionId = 0;
 
     @Override
     public void onInitialize() {
@@ -57,7 +58,9 @@ public class CopyItemMod implements ModInitializer {
             if (modKey.wasPressed()) {
                 dupeModu = (dupeModu + 1) % 3;
                 String[] modlar = {"Book Dupe", "Container Dupe", "Drop Timing Dupe"};
-                client.player.sendMessage(Text.literal("§eMod: §6" + modlar[dupeModu]), true);
+                if (client.player != null) {
+                    client.player.sendMessage(Text.literal("§eMod: §6" + modlar[dupeModu]), true);
+                }
             }
 
             if (dupeKey.wasPressed()) {
@@ -74,26 +77,23 @@ public class CopyItemMod implements ModInitializer {
             }
         });
 
-        // HUD render callback - envanter açıkken butonları çiz
+        // HUD render - envanter açıkken butonları çiz
         HudRenderCallback.EVENT.register((drawContext, tickDelta) -> {
             MinecraftClient client = MinecraftClient.getInstance();
-            if (client.player == null) return;
-
-            // Sadece envanter ekranı açıkken göster
-            if (client.currentScreen instanceof InventoryScreen) {
-                butonlariCiz(drawContext, client);
+            if (client.player != null && client.currentScreen instanceof InventoryScreen) {
+                butonlariCiz(drawContext);
             }
         });
     }
 
     // ==================== HUD BUTONLARI ====================
-    private void butonlariCiz(DrawContext ctx, MinecraftClient client) {
+    private void butonlariCiz(DrawContext ctx) {
         String[] modlar = {"Book", "Container", "Drop"};
 
         int y = BTN_Y;
-        butonCiz(ctx, "▶ Başlat", BTN_X, y, !aktif ? 0xFF55FF55 : 0xFF888888);
+        butonCiz(ctx, "▶ Baslat", BTN_X, y, !aktif ? 0xFF55FF55 : 0xFF666666);
         y += BTN_YUKSEKLIK + BTN_BOSLUK;
-        butonCiz(ctx, "■ Durdur", BTN_X, y, aktif ? 0xFFFF5555 : 0xFF888888);
+        butonCiz(ctx, "■ Durdur", BTN_X, y, aktif ? 0xFFFF5555 : 0xFF666666);
         y += BTN_YUKSEKLIK + BTN_BOSLUK;
         butonCiz(ctx, "Mod: " + modlar[dupeModu], BTN_X, y, 0xFF5555FF);
         y += BTN_YUKSEKLIK + BTN_BOSLUK;
@@ -101,24 +101,26 @@ public class CopyItemMod implements ModInitializer {
     }
 
     private void butonCiz(DrawContext ctx, String yazi, int x, int y, int renk) {
+        MinecraftClient mc = MinecraftClient.getInstance();
         // Buton arkaplanı
-        ctx.fill(x, y, x + BTN_GENISLIK, y + BTN_YUKSEKLIK, 0xCC000000 | (renk & 0x00FFFFFF));
+        ctx.fill(x, y, x + BTN_GENISLIK, y + BTN_YUKSEKLIK, 0xCC000000);
         // Kenarlık
-        ctx.fill(x, y, x + BTN_GENISLIK, y + 1, 0xFFFFFFFF);
-        ctx.fill(x, y + BTN_YUKSEKLIK - 1, x + BTN_GENISLIK, y + BTN_YUKSEKLIK, 0xFFFFFFFF);
-        ctx.fill(x, y, x + 1, y + BTN_YUKSEKLIK, 0xFFFFFFFF);
-        ctx.fill(x + BTN_GENISLIK - 1, y, x + BTN_GENISLIK, y + BTN_YUKSEKLIK, 0xFFFFFFFF);
+        ctx.fill(x, y, x + BTN_GENISLIK, y + 1, renk);
+        ctx.fill(x, y + BTN_YUKSEKLIK - 1, x + BTN_GENISLIK, y + BTN_YUKSEKLIK, renk);
+        ctx.fill(x, y, x + 1, y + BTN_YUKSEKLIK, renk);
+        ctx.fill(x + BTN_GENISLIK - 1, y, x + BTN_GENISLIK, y + BTN_YUKSEKLIK, renk);
         // Yazı
-        int yaziX = x + (BTN_GENISLIK - MinecraftClient.getInstance().textRenderer.getWidth(yazi)) / 2;
+        int yaziX = x + (BTN_GENISLIK - mc.textRenderer.getWidth(yazi)) / 2;
         int yaziY = y + (BTN_YUKSEKLIK - 8) / 2;
-        ctx.drawTextWithShadow(MinecraftClient.getInstance().textRenderer, yazi, yaziX, yaziY, renk);
+        ctx.drawTextWithShadow(mc.textRenderer, yazi, yaziX, yaziY, renk);
     }
 
-    // Fare tıklaması yönetimi (Mixinsiz, ClientTickEvent içinde kontrol)
-    // Bu kısım basit olsun diye sadece tuşlarla kontrol var. Fareyle tıklama için Mixin şart.
-    // Ama tuşlar zaten çalışıyor (O ve P).
+    private short yeniActionId() {
+        actionId++;
+        return actionId;
+    }
 
-    // ==================== DUPE MODLARI ====================
+    // ==================== MOD 0: BOOK DUPE ====================
     private void bookDupe(MinecraftClient c) {
         ClientPlayerEntity p = c.player;
         beklemeTick++;
@@ -167,7 +169,7 @@ public class CopyItemMod implements ModInitializer {
                             0,
                             SlotActionType.PICKUP,
                             p.getInventory().getStack(hedefSlot).copy(),
-                            p.currentScreenHandler.getNextActionId()
+                            yeniActionId()
                     ));
                 }
                 basarili++;
@@ -182,6 +184,7 @@ public class CopyItemMod implements ModInitializer {
         }
     }
 
+    // ==================== MOD 1: CONTAINER DUPE ====================
     private void containerDupe(MinecraftClient c) {
         ClientPlayerEntity p = c.player;
         beklemeTick++;
@@ -216,8 +219,8 @@ public class CopyItemMod implements ModInitializer {
                     slot,
                     0,
                     SlotActionType.QUICK_MOVE,
-                    hedef.copy(),
-                    p.currentScreenHandler.getNextActionId()
+                    hedef != null ? hedef.copy() : ItemStack.EMPTY,
+                    yeniActionId()
             ));
             faz = 2;
             beklemeTick = 0;
@@ -245,6 +248,8 @@ public class CopyItemMod implements ModInitializer {
                 syncId = p.currentScreenHandler.syncId;
                 faz = 4;
                 beklemeTick = 0;
+            } else {
+                durdur(c);
             }
         }
         else if (faz == 4 && beklemeTick >= 5) {
@@ -255,7 +260,7 @@ public class CopyItemMod implements ModInitializer {
                     0,
                     SlotActionType.QUICK_MOVE,
                     ItemStack.EMPTY,
-                    p.currentScreenHandler.getNextActionId()
+                    yeniActionId()
             ));
 
             c.getNetworkHandler().sendPacket(new CloseHandledScreenC2SPacket(syncId));
@@ -269,6 +274,7 @@ public class CopyItemMod implements ModInitializer {
         }
     }
 
+    // ==================== MOD 2: DROP TIMING DUPE ====================
     private void dropTimingDupe(MinecraftClient c) {
         ClientPlayerEntity p = c.player;
         beklemeTick++;
@@ -400,4 +406,4 @@ public class CopyItemMod implements ModInitializer {
         }
         return false;
     }
-                                                       }
+                                             }
