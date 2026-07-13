@@ -539,4 +539,3 @@ public class CopyItemMod implements ModInitializer {
         duping.set(false);
     }
 }
-```
