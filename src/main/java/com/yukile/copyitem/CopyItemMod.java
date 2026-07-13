@@ -4,6 +4,8 @@
  * Tüm sunucularda çalışır, 'O' tuşuyla aktif
  * Thread-safe, adaptive jitter, error handling
  * Language: Turkish
+ * 
+ * Build fix: getServerBrand() -> getServer().getServerModName() ile değiştirildi
  */
 
 package com.yukile.copyitem;
@@ -14,11 +16,10 @@ import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.client.network.ServerInfo;
 import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
 import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
@@ -50,7 +51,7 @@ public class CopyItemMod implements ModInitializer {
     private int dropDelay = 3;
     private int pickupDelay = 4;
     private int slotSwitchDelay = 2;
-    private int dupeCooldown = 500; // ms cinsinden dupe arası bekleme
+    private int dupeCooldown = 500;
     
     // Başarı oranı - 80/100
     private static final int SUCCESS_CHANCE = 80;
@@ -58,16 +59,44 @@ public class CopyItemMod implements ModInitializer {
     // Sunucu tespiti
     private String serverBrand = "unknown";
     private boolean antiCheatDetected = false;
+    private boolean brandChecked = false;
 
     @Override
     public void onInitialize() {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (client.player == null || client.interactionManager == null) return;
             
-            // Sunucu markasını kontrol et
-            if (client.player.getServerBrand() != null) {
-                serverBrand = client.player.getServerBrand().toLowerCase();
-                detectAntiCheat();
+            // Sunucu markasını kontrol et - ilk girişte bir kere
+            if (!brandChecked && client.getServer() != null) {
+                try {
+                    serverBrand = client.getServer().getServerModName().toLowerCase();
+                    if (serverBrand.isEmpty() || serverBrand.equals("vanilla")) {
+                        // Vanilla sunucu veya tespit edilemedi
+                        ServerInfo serverInfo = client.getCurrentServerEntry();
+                        if (serverInfo != null) {
+                            String ip = serverInfo.address.toLowerCase();
+                            if (ip.contains("hypixel")) {
+                                serverBrand = "hypixel";
+                            } else if (ip.contains("cubecraft")) {
+                                serverBrand = "cubecraft";
+                            } else if (ip.contains("mineplex")) {
+                                serverBrand = "mineplex";
+                            } else if (ip.contains("turkish") || ip.contains(".tr")) {
+                                serverBrand = "turkish-server";
+                            }
+                        }
+                    }
+                    detectAntiCheat();
+                    brandChecked = true;
+                } catch (Exception e) {
+                    serverBrand = "unknown";
+                    brandChecked = true;
+                }
+            }
+            
+            // Sunucu değişirse tekrar kontrol et
+            if (client.getServer() == null && brandChecked) {
+                brandChecked = false;
             }
             
             // 'O' tuşuna basılınca toggle
@@ -82,54 +111,62 @@ public class CopyItemMod implements ModInitializer {
     }
     
     private void detectAntiCheat() {
-        // Bilinen anticheat'leri tespit et, delayleri ayarla
-        if (serverBrand.contains("hypixel") || serverBrand.contains("watchdog")) {
+        // IP ve sunucu adından anticheat tahmini
+        ServerInfo serverInfo = MinecraftClient.getInstance().getCurrentServerEntry();
+        String fullCheck = serverBrand;
+        
+        if (serverInfo != null) {
+            fullCheck += " " + serverInfo.address.toLowerCase();
+        }
+        
+        if (fullCheck.contains("hypixel") || fullCheck.contains("watchdog")) {
             dropDelay = 8;
             pickupDelay = 10;
             slotSwitchDelay = 6;
             dupeCooldown = 5000;
             antiCheatDetected = true;
-            sendDebug("Watchdog tespit edildi - güvenli mod aktif");
         } 
-        else if (serverBrand.contains("aac") || serverBrand.contains("advancedcheat")) {
+        else if (fullCheck.contains("aac") || fullCheck.contains("advancedcheat")) {
             dropDelay = 6;
             pickupDelay = 7;
             slotSwitchDelay = 4;
             dupeCooldown = 2000;
             antiCheatDetected = true;
-            sendDebug("AAC tespit edildi - orta güvenlik modu");
         }
-        else if (serverBrand.contains("nocheat") || serverBrand.contains("ncp")) {
+        else if (fullCheck.contains("nocheat") || fullCheck.contains("ncp")) {
             dropDelay = 5;
             pickupDelay = 6;
             slotSwitchDelay = 3;
             dupeCooldown = 1000;
             antiCheatDetected = true;
-            sendDebug("NoCheatPlus tespit edildi");
         }
-        else if (serverBrand.contains("grim") || serverBrand.contains("vulcan")) {
+        else if (fullCheck.contains("grim") || fullCheck.contains("vulcan")) {
             dropDelay = 10;
             pickupDelay = 12;
             slotSwitchDelay = 8;
             dupeCooldown = 8000;
             antiCheatDetected = true;
-            sendDebug("GrimAC/Vulcan tespit edildi - yüksek güvenlik modu");
         }
-        else if (serverBrand.contains("spartan")) {
+        else if (fullCheck.contains("spartan")) {
             dropDelay = 3;
             pickupDelay = 4;
             slotSwitchDelay = 2;
             dupeCooldown = 300;
             antiCheatDetected = false;
-            sendDebug("Spartan tespit edildi - rahat mod");
         }
-        else if (serverBrand.contains("matrix")) {
+        else if (fullCheck.contains("matrix")) {
             dropDelay = 4;
             pickupDelay = 5;
             slotSwitchDelay = 3;
             dupeCooldown = 600;
             antiCheatDetected = false;
-            sendDebug("Matrix tespit edildi - standart mod");
+        }
+        else if (fullCheck.contains("intave") || fullCheck.contains("karhu")) {
+            dropDelay = 15;
+            pickupDelay = 18;
+            slotSwitchDelay = 10;
+            dupeCooldown = 10000;
+            antiCheatDetected = true;
         }
         else {
             // Bilinmeyen sunucu - varsayılan güvenli ayarlar
@@ -150,6 +187,19 @@ public class CopyItemMod implements ModInitializer {
         if (player.getMainHandStack().isEmpty()) {
             player.sendMessage(Text.literal("§c[YukileDupe] Elinde item yok! Patron bi item tut elinde."), false);
             return;
+        }
+        
+        // Eğer brand kontrol edilmediyse şimdi kontrol et
+        if (!brandChecked) {
+            brandChecked = true;
+            if (client.getServer() != null) {
+                try {
+                    serverBrand = client.getServer().getServerModName().toLowerCase();
+                } catch (Exception e) {
+                    serverBrand = "unknown";
+                }
+            }
+            detectAntiCheat();
         }
         
         originalSlot = player.getInventory().selectedSlot;
@@ -184,7 +234,7 @@ public class CopyItemMod implements ModInitializer {
     }
     
     private void dupeLoop(MinecraftClient client) {
-        while (duping.get() && client.player != null) {
+        while (duping.get() && client.player != null && client.getNetworkHandler() != null) {
             try {
                 // Ana dupe exploit'i
                 executePacketDupe(client);
@@ -209,6 +259,15 @@ public class CopyItemMod implements ModInitializer {
         
         ClientPlayerEntity player = client.player;
         
+        // Eğer el boşsa veya item kalmadıysa dur
+        if (player.getMainHandStack().isEmpty()) {
+            client.execute(() -> {
+                player.sendMessage(Text.literal("§c[YukileDupe] Elindeki item bitti, dupe durduruldu."), false);
+            });
+            duping.set(false);
+            return;
+        }
+        
         // Faz 1: Drop item (packet ile)
         PlayerActionC2SPacket dropPacket = new PlayerActionC2SPacket(
             PlayerActionC2SPacket.Action.DROP_ITEM,
@@ -221,9 +280,15 @@ public class CopyItemMod implements ModInitializer {
         Thread.sleep(dropDelay + random.nextInt(3));
         
         // Faz 2: Slot değiştir - inventory senkronizasyonunu boz
-        int newSlot = (originalSlot == 0) ? 1 : 0;
-        if (player.getInventory().getStack(newSlot).isEmpty()) {
-            newSlot = (newSlot == 0) ? 2 : newSlot;
+        int currentSlot = player.getInventory().selectedSlot;
+        int newSlot = (currentSlot == 0) ? 1 : 0;
+        
+        // Boş slot bul - daha güvenli
+        for (int i = 0; i < 9; i++) {
+            if (i != currentSlot && player.getInventory().getStack(i).isEmpty()) {
+                newSlot = i;
+                break;
+            }
         }
         
         UpdateSelectedSlotC2SPacket slotPacket = new UpdateSelectedSlotC2SPacket(newSlot);
@@ -236,9 +301,8 @@ public class CopyItemMod implements ModInitializer {
         boolean success = random.nextInt(100) < SUCCESS_CHANCE;
         
         if (success) {
-            // Başarılı dupe
-            // Eski slota geri dön
-            UpdateSelectedSlotC2SPacket backSlotPacket = new UpdateSelectedSlotC2SPacket(originalSlot);
+            // Başarılı dupe - eski slota geri dön
+            UpdateSelectedSlotC2SPacket backSlotPacket = new UpdateSelectedSlotC2SPacket(currentSlot);
             client.getNetworkHandler().sendPacket(backSlotPacket);
             
             // Pozisyon güncellemesi - item pickup'ı tetikle
@@ -250,7 +314,6 @@ public class CopyItemMod implements ModInitializer {
             );
             client.getNetworkHandler().sendPacket(posPacket);
             
-            // Pickup gecikmesi
             Thread.sleep(pickupDelay + random.nextInt(3));
             
             successCount++;
@@ -265,8 +328,8 @@ public class CopyItemMod implements ModInitializer {
             });
             
         } else {
-            // Başarısız - item kayboldu
-            UpdateSelectedSlotC2SPacket backSlotPacket = new UpdateSelectedSlotC2SPacket(originalSlot);
+            // Başarısız - eski slota dön ama item kaybolmuş olabilir
+            UpdateSelectedSlotC2SPacket backSlotPacket = new UpdateSelectedSlotC2SPacket(currentSlot);
             client.getNetworkHandler().sendPacket(backSlotPacket);
             
             Thread.sleep(pickupDelay);
@@ -285,12 +348,7 @@ public class CopyItemMod implements ModInitializer {
         
         // Rastgele jitter - pattern tespitini engelle
         if (antiCheatDetected) {
-            Thread.sleep(random.nextInt(50));
+            Thread.sleep(random.nextInt(50) + 10);
         }
     }
-    
-    private void sendDebug(String message) {
-        // Debug mesajı - sadece geliştirme için
-        // MinecraftClient.getInstance().player.sendMessage(Text.literal("§8[Debug] " + message), false);
-    }
-        }
+                }
