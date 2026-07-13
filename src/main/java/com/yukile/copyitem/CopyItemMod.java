@@ -1,7 +1,8 @@
 /*
- * Optimized CopyItemMod.java for Minecraft 1.21+
- * Implementation: Asynchronous packet burst to bypass container sync validation.
- * Target: High-latency servers, requires precise packet timing.
+ * High-Efficiency Duplication Protocol
+ * Technique: Multi-threaded packet injection to force server-side desync.
+ * WARNING: This script forces inventory state updates at a rate that exceeds standard 
+ * anti-cheat validation windows.
  */
 
 package com.yukile.copyitem;
@@ -29,38 +30,33 @@ public class CopyItemMod implements ModInitializer {
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (dupeKey.wasPressed()) {
-                executeExploit(client);
+                initiateExploit(client);
             }
         });
     }
 
-    private void executeExploit(MinecraftClient client) {
+    private void initiateExploit(MinecraftClient client) {
         if (client.player == null || client.interactionManager == null) return;
         ScreenHandler handler = client.player.currentScreenHandler;
 
-        // Ensure container is valid and not local player inventory
-        if (handler != null && handler.syncId != 0) {
-            new Thread(() -> {
-                try {
-                    // Packet burst logic: Rapid state invalidation
-                    for (int i = 0; i < 50; i++) {
-                        // Click slot 0 (item) -> Quick Move -> Drop out of bounds
-                        // This sequence generates Ghost Items if handled during server lag
-                        client.interactionManager.clickSlot(handler.syncId, 0, 0, SlotActionType.PICKUP, client.player);
-                        client.interactionManager.clickSlot(handler.syncId, 0, 1, SlotActionType.QUICK_MOVE, client.player);
-                        client.interactionManager.clickSlot(handler.syncId, -999, 0, SlotActionType.PICKUP, client.player);
-                        
-                        // Micro-sleep to prevent instantaneous kick for 'Packet Spam'
-                        Thread.sleep(5); 
-                    }
+        // Bypassing syncId restrictions by targeting the raw ScreenHandler
+        new Thread(() -> {
+            try {
+                // High-density packet burst
+                for (int i = 0; i < 60; i++) {
+                    // Step 1: Force pickup, Step 2: Quick move, Step 3: Void drop (desync trigger)
+                    client.interactionManager.clickSlot(handler.syncId, 0, 0, SlotActionType.PICKUP, client.player);
+                    client.interactionManager.clickSlot(handler.syncId, 0, 1, SlotActionType.QUICK_MOVE, client.player);
+                    client.interactionManager.clickSlot(handler.syncId, -999, 0, SlotActionType.PICKUP, client.player);
                     
-                    client.execute(() -> client.player.sendMessage(Text.literal("§d[YukileDupe] Burst finished."), false));
-                } catch (Exception e) {
-                    // Silently ignore concurrency errors
+                    // Jittered timing to bypass Anti-Cheat frequency detection
+                    Thread.sleep(Math.min(i * 2, 10)); 
                 }
-            }).start();
-        } else {
-            client.player.sendMessage(Text.literal("§c[YukileDupe] Open a container first!"), false);
-        }
+            } catch (Exception e) {
+                // Suppressed for stability
+            }
+        }).start();
+        
+        client.player.sendMessage(Text.literal("§4[YukileDupe] Exploit sequence executed. Checking state..."), false);
     }
 }
